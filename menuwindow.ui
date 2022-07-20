@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <menu id="menubar">
+    <submenu>
+      <attribute name="label" translatable="yes">文件</attribute>
+      <section>
+        <item>
+          <attribute name="label" translatable="yes">添加HTTP/FTP/Magnet任务</attribute>
+          <attribute name="action">win.new</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">添加BT/PT任务</attribute>
+          <attribute name="action">win.open</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">添加Metalink任务</attribute>
+          <attribute name="action">win.save</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">none</attribute>
+          <attribute name="action">win.save-as</attribute>
+        </item>
+      </section>
+      <section>
+        <item>
+          <attribute name="label" translatable="yes">退出</attribute>
+          <attribute name="action">win.quit</attribute>
+        </item>
+      </section>
+    </submenu>
+    <submenu>
+      <attribute name="label" translatable="yes">任务管理</attribute>
+      <section>
+        <item>
+          <attribute name="label" translatable="yes">暂停所有任务</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">继续所有任务</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">删除已完成或者错误的任务</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_删除条目</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_打开保存文件夹</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_开始</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_暂停</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_向上</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_向下</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_移到顶部</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_移到底部</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+      </section>
+    </submenu>
+    <submenu>
+      <attribute name="label" translatable="yes">_编辑</attribute>
+      <section>
+        <item>
+          <attribute name="label" translatable="yes">_设置</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_剪切</attribute>
+          <attribute name="action">win.cut</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_粘贴</attribute>
+          <attribute name="action">win.paste</attribute>
+        </item>
+      </section>
+    </submenu>
+    <submenu>
+      <attribute name="label" translatable="yes">_查看</attribute>
+      <section>
+        <item>
+          <attribute name="label" translatable="yes">_none</attribute>
+          <attribute name="action">win.copy</attribute>
+        </item>
+      </section>
+    </submenu>
+    <submenu>
+      <attribute name="label" translatable="yes">_帮助</attribute>
+      <section>
+        <item>
+          <attribute name="label" translatable="yes">_帮助</attribute>
+          <attribute name="action">win.help</attribute>
+        </item>
+        <item>
+          <attribute name="label" translatable="yes">_关于</attribute>
+          <attribute name="action">win.about</attribute>
+        </item>
+      </section>
+    </submenu>
+  </menu>
+  <menu id="new_download_menu_model">
+    <section>
+      <item>
+        <attribute name="label">新建下载</attribute>
+        <attribute name="action">win.new</attribute>
+      </item>
+      <item>
+        <attribute name="label">新建种子</attribute>
+        <attribute name="action">win.save</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label">新建磁链</attribute>
+        <attribute name="action">win.save</attribute>
+      </item>
+    </section>
+  </menu>
+  <object class="GtkAboutDialog" id="aboutdialog1">
+    <property name="program-name" translatable="yes">下载管理器</property>
+    <property name="logo-icon-name" translatable="yes">org.gtk.Demo4</property>
+    <property name="modal">True</property>
+    <property name="hide-on-close">True</property>
+    <property name="transient-for">window1</property>
+  </object>
+  <object class="GtkApplicationWindow" id="window1">
+    <property name="default-width">1280</property>
+    <property name="default-height">800</property>
+    <property name="title" translatable="yes">下载管理器</property>
+    <property name="hide-on-close">True</property>
+    <child>
+      <object class="GtkBox" id="vbox1">
+        <property name="orientation">vertical</property>
+        <child>
+          <object class="GtkPopoverMenuBar" id="menubar1">
+            <property name="menu-model">menubar</property>
+            <accessibility>
+              <property name="label">Main Menu</property>
+            </accessibility>
+          </object>
+        </child>
+        <child>
+          <object class="GtkBox" id="toolbar1">
+            <property name="accessible-role">toolbar</property>
+            <property name="css-classes">toolbar</property>
+            <accessibility>
+              <property name="label">Toolbar</property>
+            </accessibility>
+            <child>
+              <object class="GtkMenuButton">
+                <property name="label" translatable="yes">新建下载</property>
+                <property name="tooltip-text" translatable="yes">新建下载</property>
+                <property name="direction">down</property>
+                <property name="halign">start</property>
+                <property name="icon-name">document-new-symbolic</property>
+                <property name="menu-model">new_download_menu_model</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="label" translatable="yes">开始下载</property>
+                <property name="tooltip-text" translatable="yes">运行选中的下载</property>
+                <property name="icon-name">media-playback-start-symbolic</property>
+                <property name="action-name">win.open</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="label" translatable="yes">暂停下载</property>
+                <property name="tooltip-text" translatable="yes">暂停选中的下载</property>
+                <property name="icon-name">media-playback-pause-symbolic</property>
+                <property name="action-name">win.save</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkSeparator" />
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="label" translatable="yes">向上移动</property>
+                <property name="tooltip-text" translatable="yes">上移选择的下载</property>
+                <property name="icon-name">go-up-symbolic</property>
+                <property name="action-name">win.copy</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="label" translatable="yes">向下移动</property>
+                <property name="tooltip-text" translatable="yes">下移选择的下载</property>
+                <property name="icon-name">go-down-symbolic</property>
+                <property name="action-name">win.cut</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="label" translatable="yes">移动到顶部</property>
+                <property name="tooltip-text" translatable="yes">移动选中的下载到顶部</property>
+                <property name="icon-name">go-top-symbolic</property>
+                <property name="action-name">win.paste</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton">
+                <property name="label" translatable="yes">移动到底部</property>
+                <property name="tooltip-text" translatable="yes">移动选中的下载到底部</property>
+                <property name="icon-name">go-bottom-symbolic</property>
+                <property name="action-name">win.paste</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkScrolledWindow" id="scrolledwindow1">
+            <property name="has-frame">1</property>
+            <property name="hexpand">1</property>
+            <property name="vexpand">1</property>
+            <child>
+              <object class="GtkTreeView" id="treeview1">
+                <property name="tooltip-column">11</property>
+                <property name="enable_grid_lines">both</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkStatusbar" id="statusbar1" />
+        </child>
+      </object>
+    </child>
+  </object>
+  <object class="GtkDialog" id="newdownloadialog1">
+    <property name="transient-for">window1</property>
+    <property name="modal">True</property>
+    <property name="resizable">False</property>
+    <property name="use-header-bar">0</property>
+    <property name="title" translatable="yes">新建下载</property>
+    <property name="hide-on-close">True</property>
+    <child internal-child="content_area">
+      <object class="GtkBox">
+        <child>
+          <object class="GtkGrid">
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            <property name="halign">3</property>
+            <property name="valign">3</property>
+            <property name="row-spacing">10</property>
+            <property name="column-spacing">10</property>
+            <property name="margin-start">10</property>
+            <property name="margin-end">10</property>
+            <property name="margin-top">10</property>
+            <property name="margin-bottom">10</property>
+            <child>
+              <object class="GtkLabel">
+                <property name="halign">1</property>
+                <property name="valign">1</property>
+                <property name="label">_Url:</property>
+                <property name="use-underline">True</property>
+                <property name="mnemonic-widget">url_textview</property>
+                <layout>
+                  <property name="column">0</property>
+                  <property name="row">0</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkScrolledWindow">
+                <property name="valign">1</property>
+                <property name="has-frame">1</property>
+                <property name="min-content-height">150</property>
+                <property name="max-content-height">150</property>
+                <property name="min-content-width">600</property>
+                <property name="max-content-width">600</property>
+                <child>
+                  <object class="GtkTextView" id="url_textview" />
+                </child>
+                <layout>
+                  <property name="column">1</property>
+                  <property name="row">0</property>
+                  <property name="column-span">2</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child type="action">
+      <object class="GtkButton" id="preferencedialog_ok_button">
+        <property name="margin-start">10</property>
+        <property name="margin-end">10</property>
+        <property name="margin-top">10</property>
+        <property name="margin-bottom">10</property>
+        <property name="label" translatable="1">_OK</property>
+        <property name="use-underline">1</property>
+      </object>
+    </child>
+    <!-- <child type="action">
+      <object class="GtkButton" id="preferencedialog_status_button">
+        <property name="margin-start">10</property>
+        <property name="margin-end">10</property>
+        <property name="margin-top">10</property>
+        <property name="margin-bottom">10</property>
+        <property name="label" translatable="1">_Status</property>
+        <property name="use-underline">1</property>
+      </object>
+    </child> -->
+    <child type="action">
+      <object class="GtkButton" id="preferencedialog_cancel_button">
+        <property name="margin-start">10</property>
+        <property name="margin-end">10</property>
+        <property name="margin-top">10</property>
+        <property name="margin-bottom">10</property>
+        <property name="label" translatable="1">_Cancel</property>
+        <property name="use-underline">1</property>
+      </object>
+    </child>
+    <action-widgets>
+      <action-widget response="ok" default="true">preferencedialog_ok_button</action-widget>
+      <!-- <action-widget response="accept" default="true">preferencedialog_status_button</action-widget> -->
+      <action-widget response="cancel">preferencedialog_cancel_button</action-widget>
+    </action-widgets>
+    <signal name="response" handler="preferencedialog_response_cb" swapped="NO"></signal>
+  </object>
+</interface>

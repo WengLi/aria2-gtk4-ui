@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "name": "x64",
+            "includePath": [
+                "${workspaceFolder}\\**",
+                "D:\\msys64\\mingw64\\include\\**",
+                "D:\\msys64\\mingw64\\lib\\glib-2.0\\include",
+                "D:\\msys64\\mingw64\\lib\\graphene-1.0\\include",
+                "D:\\msys64\\mingw64\\include\\gtk-4.0",
+                "D:\\msys64\\mingw64\\include\\glib-2.0",
+                "D:\\msys64\\mingw64\\include\\cairo",
+                "D:\\msys64\\mingw64\\include\\pango-1.0",
+                "D:\\msys64\\mingw64\\include\\harfbuzz",
+                "D:\\msys64\\mingw64\\include\\gdk-pixbuf-2.0",
+                "D:\\msys64\\mingw64\\include\\graphene-1.0"
+            ],
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "ms-vscode.makefile-tools",
+            "cStandard": "c17",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
