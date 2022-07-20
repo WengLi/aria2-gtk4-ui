@@ -1,4 +1,4 @@
-# aria2-gtk4-ui
+# aria2-gtk4-ui example code
 
 换进配置参考：https://stdin.top/posts/gtk4-on-windows/
 
