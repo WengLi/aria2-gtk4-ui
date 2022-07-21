@@ -1,6 +1,6 @@
 # aria2-gtk4-ui example code
 
-换进配置参考：https://stdin.top/posts/gtk4-on-windows/
+环境配置参考：https://stdin.top/posts/gtk4-on-windows/
 
 vscode新增msys64终端：
 ~~~
