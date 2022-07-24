@@ -2,36 +2,6 @@
 
 // websocket常驻线程
 static void *websocket_client_launch_thread(void *ptr);
-// aria2实例
-static aria2_object *aria2 = NULL;
-
-int response_map_compare(const void *a, const void *b, void *udata)
-{
-    const response_map *ua = a;
-    const response_map *ub = b;
-    return strcmp(ua->id, ub->id);
-}
-
-uint64_t response_map_hash(const void *item, uint64_t seed0, uint64_t seed1)
-{
-    const response_map *user = item;
-    return hashmap_sip(user->id, strlen(user->id), seed0, seed1);
-}
-
-bool response_map_iter(const void *item, void *udata)
-{
-    const response_map *map = item;
-    if (map->data)
-    {
-        cJSON *result = map->data->result;
-        jsonrpc_error_object *error = map->data->error;
-        fprintf(stderr, "%s (result=%s,error=%s)\n",
-                map->id,
-                result ? cJSON_Print(result) : "null",
-                error ? error->message : "null");
-    }
-    return true;
-}
 
 jsonrpc_request_object *jsonrpc_request_object_create(char *method, cJSON *params, int need_params, int need_token)
 {
@@ -39,7 +9,8 @@ jsonrpc_request_object *jsonrpc_request_object_create(char *method, cJSON *param
     uuid4_init();
     uuid4_generate(buf);
     jsonrpc_request_object *object = (jsonrpc_request_object *)malloc(sizeof(jsonrpc_request_object));
-    object->id = cJSON_CreateString(strdup(buf));
+    memset(object, 0, sizeof(jsonrpc_request_object));
+    object->id = cJSON_CreateString(buf);
     object->method = method;
     object->params = params;
     object->need_params = need_params;
@@ -50,22 +21,41 @@ jsonrpc_request_object *jsonrpc_request_object_create(char *method, cJSON *param
 jsonrpc_response_object *jsonrpc_response_object_create(cJSON *id, cJSON *result, jsonrpc_error_object *error)
 {
     jsonrpc_response_object *object = (jsonrpc_response_object *)malloc(sizeof(jsonrpc_response_object));
+    memset(object, 0, sizeof(jsonrpc_response_object));
     object->id = id;
     object->result = result;
     object->error = error;
     return object;
 }
 
+void jsonrpc_response_object_free(jsonrpc_response_object *object)
+{
+    if (!object)
+    {
+        return;
+    }
+    if (object->error)
+    {
+        free(object->error->message);
+        cJSON_Delete(object->error->data);
+        free(object->error);
+    }
+    cJSON_Delete(object->id);
+    cJSON_Delete(object->result);
+    free(object);
+}
+
 jsonrpc_error_object *jsonrpc_error_object_create(int code, char *message, cJSON *data)
 {
     jsonrpc_error_object *object = (jsonrpc_error_object *)malloc(sizeof(jsonrpc_error_object));
+    memset(object, 0, sizeof(jsonrpc_error_object));
     object->code = code;
     object->message = message;
     object->data = data;
     return object;
 }
 
-jsonrpc_response_object *aria2_request(jsonrpc_request_object *request)
+jsonrpc_response_object *aria2_request(aria2_object *aria2, jsonrpc_request_object *request)
 {
     cJSON *root = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "id", request->id);
@@ -80,19 +70,18 @@ jsonrpc_response_object *aria2_request(jsonrpc_request_object *request)
         cJSON_AddItemToObject(root, "params", request->params);
     }
 
-    char *id = strdup(cJSON_GetStringValue(cJSON_GetObjectItem(root, "id")));
-    hashmap_set(aria2->map, &(response_map){.id = id, .data = NULL});
+    const char *id = cJSON_GetObjectItem(root, "id")->valuestring;
+    hashmap_put(aria2->map, id, strlen(id), NULL);
 
     char *json = cJSON_Print(root);
     fprintf(stderr, "send request: %s\n", json);
     websocket_client_send(aria2->client, json);
 
     jsonrpc_response_object *object = NULL;
-    int try = 5;
+    int try = aria2->polling_try_count;
     while (object == NULL && try > 0)
     {
-        response_map *map = hashmap_get(aria2->map, &(response_map){.id = id});
-        object = map->data;
+        object = hashmap_get(aria2->map, id, strlen(id));
         if (!object)
         {
             Sleep(aria2->polling_interval);
@@ -100,62 +89,49 @@ jsonrpc_response_object *aria2_request(jsonrpc_request_object *request)
             continue;
         }
     }
-    // hashmap_scan(aria2->map, response_map_iter, NULL);
     cJSON_Delete(root);
+    hashmap_remove(aria2->map, id, strlen(id));
     free(request);
     return object;
 }
 
-void aria2_new(char *uri, char *path, char *args, char *token)
+aria2_object *aria2_new(const char *uri, const char *token)
 {
-    aria2 = (aria2_object *)malloc(sizeof(aria2_object));
+    aria2_object *aria2 = (aria2_object *)malloc(sizeof(aria2_object));
     memset(aria2, 0, sizeof(aria2_object));
-    aria2->ref_count = 0;
     aria2->uri = uri;
-    aria2->path = path;
-    aria2->args = args;
     aria2->token = token;
     aria2->polling_interval = 500;
+    aria2->polling_try_count = 5;
     aria2->init_completed = FALSE;
     aria2->paused = TRUE;
-    aria2->map = hashmap_new(sizeof(response_map), 0, 0, 0, response_map_hash, response_map_compare, NULL, NULL);
+    const unsigned initial_size = 4;
+    aria2->map = (hash_map *)malloc(sizeof(hash_map));
+    hashmap_create(initial_size, aria2->map);
+    return aria2;
 }
 
 //命令执行成功返回0，执行失败返回-1。
-int aria2_launch()
+int aria2_launch(aria2_object *aria2)
 {
+
     char *path = "aria2c";
     char *args = "--conf-path=aria2.conf -D";
-    uint16_t *path_utf16 = ug_utf8_to_utf16(path, -1, NULL);
-    uint16_t *args_utf16 = ug_utf8_to_utf16(args, -1, NULL);
+    uint16_t *path_utf16 = utf8_to_utf16(path, -1, NULL);
+    uint16_t *args_utf16 = utf8_to_utf16(args, -1, NULL);
     //先启动aria2
-    int result = (int)ShellExecuteW(NULL, L"open", path_utf16, args_utf16, NULL, SW_SHOW);//SW_HIDE;
-    if (result > 32)
-    {
-        fprintf(stderr, "start aria2 success: %d\n", result);
-    }
-    else
-    {
-        fprintf(stderr, "start aria2 failed: %d\n", result);
-    }
+    // int result = (int)ShellExecuteW(NULL, L"open", path_utf16, args_utf16, NULL, SW_SHOW); // SW_SHOW,SW_HIDE;
+    // if (result > 32)
+    // {
+    //     fprintf(stderr, "start aria2 success: %d\n", result);
+    // }
+    // else
+    // {
+    //     fprintf(stderr, "start aria2 failed: %d\n", result);
+    // }
     //在启动websocketclient
     pthread_create(&aria2->client_thread, NULL, websocket_client_launch_thread, (void *)aria2);
     return TRUE;
-}
-
-uint8_t aria2_is_paused()
-{
-    return aria2->paused;
-}
-
-void aria2_set_paused(uint8_t b)
-{
-    aria2->paused = b;
-}
-
-uint8_t aria2_init_completed()
-{
-    return aria2->init_completed;
 }
 
 int client_onclose(websocket_client *c)
@@ -177,31 +153,35 @@ int client_onerror(websocket_client *c, websocket_client_error *err)
 
 int client_onmessage(websocket_client *c, websocket_client_message *msg)
 {
+    aria2_object *aria2 = (aria2_object *)c->onmessage_in_data;
     cJSON *root = cJSON_Parse(msg->payload);
     cJSON *id = cJSON_GetObjectItem(root, "id");
     if (id == NULL)
     {
         return 0;
     }
-    char *id_str = strdup(cJSON_GetStringValue(id));
+    const char *id_str = strdup(cJSON_GetStringValue(id));
     cJSON *result = cJSON_GetObjectItem(root, "result");
+    const char *result_str = cJSON_Print(result);
     cJSON *error = cJSON_GetObjectItem(root, "error");
-    response_map *map = hashmap_get(aria2->map, &(response_map){.id = id_str});
-    if (map)
+    if (1 == hashmap_contains_key(aria2->map, id_str, strlen(id_str)))
     {
         jsonrpc_error_object *er = NULL;
 
         if (error)
         {
-            er = jsonrpc_error_object_create(
-                cJSON_GetObjectItem(error, "code")->valueint,
-                cJSON_GetObjectItem(error, "message")->valuestring,
-                cJSON_GetObjectItem(error, "data"));
+            cJSON *error_code = cJSON_GetObjectItem(error, "code");
+            cJSON *error_msg = cJSON_GetObjectItem(error, "message");
+            cJSON *error_data = cJSON_GetObjectItem(error, "data");
+            const char *error_data_str = cJSON_Print(error_data);
+            er = jsonrpc_error_object_create(error_code->valueint, strdup(error_msg->valuestring), cJSON_CreateString(error_data_str));
         }
 
-        hashmap_set(aria2->map, &(response_map){.id = id_str, .data = jsonrpc_response_object_create(id, result, er)});
+        jsonrpc_response_object *response_object =
+            jsonrpc_response_object_create(cJSON_CreateString(id_str), cJSON_Parse(result_str), er);
+        hashmap_put(aria2->map, id_str, strlen(id_str), response_object);
     }
-
+    cJSON_Delete(root);
     fprintf(stderr, "onmessage: (%llu): %s\n", msg->payload_len, msg->payload);
     return 0;
 }
@@ -216,10 +196,10 @@ void *websocket_client_launch_thread(void *ptr)
 {
     aria2_object *aria2 = (aria2_object *)ptr;
     websocket_client *client = websocket_client_new(aria2->uri);
-    websocket_client_onopen(client, client_onopen);
-    websocket_client_onmessage(client, client_onmessage);
-    websocket_client_onerror(client, client_onerror);
-    websocket_client_onclose(client, client_onclose);
+    websocket_client_onopen(client, client_onopen, aria2);
+    websocket_client_onmessage(client, client_onmessage, aria2);
+    websocket_client_onerror(client, client_onerror, aria2);
+    websocket_client_onclose(client, client_onclose, aria2);
     websocket_client_run(client);
     aria2->client = client;
     aria2->init_completed = TRUE;
@@ -227,19 +207,22 @@ void *websocket_client_launch_thread(void *ptr)
     return NULL;
 }
 
-void aria2_shutdown()
+void aria2_shutdown(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.shutdown", cJSON_CreateArray(), true, true);
-    aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.shutdown", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *object = aria2_request(aria2, request);
+    jsonrpc_response_object_free(object);
 }
 
-void aria2_force_shutdown()
+void aria2_force_shutdown(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forceShutdown", cJSON_CreateArray(), true, true);
-    aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forceShutdown", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *object = aria2_request(aria2, request);
+    jsonrpc_response_object_free(object);
 }
 
-jsonrpc_response_object *aria2_add_uri(char **uris, int uris_len, key_value_pair options[], int options_len, int position)
+jsonrpc_response_object *aria2_add_uri(aria2_object *aria2, char **uris, int uris_len,
+                                       key_value_pair options[], int options_len, int position)
 {
     cJSON *params = cJSON_CreateArray();
 
@@ -259,21 +242,19 @@ jsonrpc_response_object *aria2_add_uri(char **uris, int uris_len, key_value_pair
     cJSON_AddItemToArray(params, options_object);
 
     cJSON_AddItemToArray(params, cJSON_CreateNumber(position));
-    fprintf(stderr, "aria2_add_uri:jsonrpc_request_object_create\n");
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.addUri", params, true, true);
-    fprintf(stderr, "aria2_add_uri:aria2_request\n");
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.addUri", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_add_torrent(unsigned char *torrent, char **uris, int uris_len, key_value_pair options[], int options_len, int position)
+jsonrpc_response_object *aria2_add_torrent(aria2_object *aria2, unsigned char *torrent, int torrent_length,
+                                           char **uris, int uris_len, key_value_pair options[], int options_len, int position)
 {
     cJSON *params = cJSON_CreateArray();
 
-    int sourcelen = strlen(torrent);
-    int targetlen = (sourcelen + 2) / 3 * 4;
+    int targetlen = (torrent_length + 2) / 3 * 4;
     char target[targetlen];
-    base64_encode(torrent, sourcelen, target, targetlen);
+    base64_encode(torrent, torrent_length, target, targetlen);
     cJSON_AddItemToArray(params, cJSON_CreateString(target));
 
     cJSON *uri_array = cJSON_CreateArray();
@@ -292,19 +273,19 @@ jsonrpc_response_object *aria2_add_torrent(unsigned char *torrent, char **uris, 
 
     cJSON_AddItemToArray(params, cJSON_CreateNumber(position));
 
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.addTorrent", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.addTorrent", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_add_metalink(unsigned char *torrent, key_value_pair options[], int options_len, int position)
+jsonrpc_response_object *aria2_add_metalink(aria2_object *aria2, unsigned char *torrent, int torrent_length,
+                                            key_value_pair options[], int options_len, int position)
 {
     cJSON *params = cJSON_CreateArray();
 
-    int sourcelen = strlen(torrent);
-    int targetlen = (sourcelen + 2) / 3 * 4;
+    int targetlen = (torrent_length + 2) / 3 * 4;
     char target[targetlen];
-    base64_encode(torrent, sourcelen, target, targetlen);
+    base64_encode(torrent, torrent_length, target, targetlen);
     cJSON_AddItemToArray(params, cJSON_CreateString(target));
 
     cJSON *options_object = cJSON_CreateObject();
@@ -316,130 +297,130 @@ jsonrpc_response_object *aria2_add_metalink(unsigned char *torrent, key_value_pa
 
     cJSON_AddItemToArray(params, cJSON_CreateNumber(position));
 
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.addMetalink", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.addMetalink", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_version()
+jsonrpc_response_object *aria2_get_version(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getVersion", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getVersion", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_remove(char *gid)
-{
-    cJSON *params = cJSON_CreateArray();
-    cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.remove", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
-    return result;
-}
-
-jsonrpc_response_object *aria2_force_remove(char *gid)
+jsonrpc_response_object *aria2_remove(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forceRemove", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.remove", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_pause(char *gid)
+jsonrpc_response_object *aria2_force_remove(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.pause", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forceRemove", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_pause_all()
-{
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.pauseAll", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
-    return result;
-}
-
-jsonrpc_response_object *aria2_force_pause(char *gid)
+jsonrpc_response_object *aria2_pause(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forcePause", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.pause", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_force_pause_all()
+jsonrpc_response_object *aria2_pause_all(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forcePauseAll", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.pauseAll", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_unpause(char *gid)
-{
-    cJSON *params = cJSON_CreateArray();
-    cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.unpause", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
-    return result;
-}
-
-jsonrpc_response_object *aria2_unpause_all()
-{
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.unpauseAll", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
-    return result;
-}
-
-jsonrpc_response_object *aria2_tell_status(char *gid)
+jsonrpc_response_object *aria2_force_pause(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellStatus", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forcePause", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_uris(char *gid)
+jsonrpc_response_object *aria2_force_pause_all(aria2_object *aria2)
+{
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.forcePauseAll", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
+    return result;
+}
+
+jsonrpc_response_object *aria2_unpause(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getUris", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.unpause", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_peers(char *gid)
+jsonrpc_response_object *aria2_unpause_all(aria2_object *aria2)
+{
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.unpauseAll", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
+    return result;
+}
+
+jsonrpc_response_object *aria2_tell_status(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getPeers", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellStatus", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_files(char *gid)
+jsonrpc_response_object *aria2_get_uris(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getFiles", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getUris", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_servers(char *gid)
+jsonrpc_response_object *aria2_get_files(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getServers", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getFiles", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_change_position(char *gid, int pos, change_position_how how)
+jsonrpc_response_object *aria2_get_peers(aria2_object *aria2, char *gid)
+{
+    cJSON *params = cJSON_CreateArray();
+    cJSON_AddItemToArray(params, cJSON_CreateString(gid));
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getPeers", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
+    return result;
+}
+
+jsonrpc_response_object *aria2_get_servers(aria2_object *aria2, char *gid)
+{
+    cJSON *params = cJSON_CreateArray();
+    cJSON_AddItemToArray(params, cJSON_CreateString(gid));
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getServers", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
+    return result;
+}
+
+jsonrpc_response_object *aria2_change_position(aria2_object *aria2, char *gid, int pos, change_position_how how)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
@@ -456,39 +437,39 @@ jsonrpc_response_object *aria2_change_position(char *gid, int pos, change_positi
         cJSON_AddItemToArray(params, cJSON_CreateString("POS_END"));
         break;
     }
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changePosition", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changePosition", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_tell_active()
+jsonrpc_response_object *aria2_tell_active(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellActive", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellActive", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_tell_waiting(int offset, int num)
-{
-    cJSON *params = cJSON_CreateArray();
-    cJSON_AddItemToArray(params, cJSON_CreateNumber(offset));
-    cJSON_AddItemToArray(params, cJSON_CreateNumber(num));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellWaiting", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
-    return result;
-}
-
-jsonrpc_response_object *aria2_tell_stopped(int offset, int num)
+jsonrpc_response_object *aria2_tell_waiting(aria2_object *aria2, int offset, int num)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateNumber(offset));
     cJSON_AddItemToArray(params, cJSON_CreateNumber(num));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellStopped", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellWaiting", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_tell_all()
+jsonrpc_response_object *aria2_tell_stopped(aria2_object *aria2, int offset, int num)
+{
+    cJSON *params = cJSON_CreateArray();
+    cJSON_AddItemToArray(params, cJSON_CreateNumber(offset));
+    cJSON_AddItemToArray(params, cJSON_CreateNumber(num));
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.tellStopped", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
+    return result;
+}
+
+jsonrpc_response_object *aria2_tell_all(aria2_object *aria2)
 {
     cJSON *params = cJSON_CreateArray();
 
@@ -526,21 +507,22 @@ jsonrpc_response_object *aria2_tell_all()
     cJSON_AddItemToObject(tellActive, "params", tellActiveParams);
     cJSON_AddItemToArray(params, tellActive);
 
-    jsonrpc_request_object *request = jsonrpc_request_object_create("system.multicall", params, true, false);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("system.multicall", params, TRUE, FALSE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_option(char *gid)
+jsonrpc_response_object *aria2_get_option(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getOption", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getOption", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_change_uri(char *gid, int fileindex, char **delUris, int delUris_len, char **addUris, int addUris_len, int position)
+jsonrpc_response_object *aria2_change_uri(aria2_object *aria2, char *gid, int fileindex,
+                                          char **delUris, int delUris_len, char **addUris, int addUris_len, int position)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
@@ -562,12 +544,12 @@ jsonrpc_response_object *aria2_change_uri(char *gid, int fileindex, char **delUr
 
     cJSON_AddItemToArray(params, cJSON_CreateNumber(position));
 
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changeUri", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changeUri", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_change_option(char *gid, key_value_pair options[], int options_len)
+jsonrpc_response_object *aria2_change_option(aria2_object *aria2, char *gid, key_value_pair options[], int options_len)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
@@ -579,19 +561,19 @@ jsonrpc_response_object *aria2_change_option(char *gid, key_value_pair options[]
     }
     cJSON_AddItemToArray(params, options_object);
 
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changeOption", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changeOption", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_global_option()
+jsonrpc_response_object *aria2_get_global_option(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getGlobalOption", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getGlobalOption", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_change_global_option(key_value_pair options[], int options_len)
+jsonrpc_response_object *aria2_change_global_option(aria2_object *aria2, key_value_pair options[], int options_len)
 {
     cJSON *params = cJSON_CreateArray();
 
@@ -602,44 +584,44 @@ jsonrpc_response_object *aria2_change_global_option(key_value_pair options[], in
     }
     cJSON_AddItemToArray(params, options_object);
 
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changeGlobalOption", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.changeGlobalOption", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_purge_download_result()
+jsonrpc_response_object *aria2_purge_download_result(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.purgeDownloadResult", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.purgeDownloadResult", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_remove_download_result(char *gid)
+jsonrpc_response_object *aria2_remove_download_result(aria2_object *aria2, char *gid)
 {
     cJSON *params = cJSON_CreateArray();
     cJSON_AddItemToArray(params, cJSON_CreateString(gid));
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.removeDownloadResult", params, true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.removeDownloadResult", params, TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_session_info()
+jsonrpc_response_object *aria2_get_session_info(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getSessionInfo", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getSessionInfo", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_get_global_stat()
+jsonrpc_response_object *aria2_get_global_stat(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getGlobalStat", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.getGlobalStat", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }
 
-jsonrpc_response_object *aria2_save_session()
+jsonrpc_response_object *aria2_save_session(aria2_object *aria2)
 {
-    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.saveSession", cJSON_CreateArray(), true, true);
-    jsonrpc_response_object *result = aria2_request(request);
+    jsonrpc_request_object *request = jsonrpc_request_object_create("aria2.saveSession", cJSON_CreateArray(), TRUE, TRUE);
+    jsonrpc_response_object *result = aria2_request(aria2, request);
     return result;
 }

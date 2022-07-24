@@ -1,29 +1,17 @@
 #ifndef WEB_SOCKET_CLIENT_H
 #define WEB_SOCKET_CLIENT_H
 
-// #define HAVE_LIBSSL
-
-#include <stdint.h>
 #include <pthread.h>
-#include <stddef.h>
-#include <sys/types.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/time.h>
-#include "sha1.h"
-#include "base64.h"
-#include "utilities.h"
-#include "socketobject.h"
-
-#ifdef HAVE_LIBSSL
+// for wss link
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/crypto.h>
-#endif
+// customize
+#include "sha1.h"
+#include "base64.h"
+#include "socketobject.h"
 
 #define FRAME_CHUNK_LENGTH 1024
-#define HELPER_RECV_BUF_SIZE 1024
 
 #define CLIENT_IS_SSL (1 << 0)
 #define CLIENT_CONNECTING (1 << 1)
@@ -34,9 +22,6 @@
 #define REQUEST_HAS_UPGRADE (1 << 1)
 #define REQUEST_VALID_STATUS (1 << 2)
 #define REQUEST_VALID_ACCEPT (1 << 3)
-
-#define WS_FRAGMENT_START (1 << 0)
-#define WS_FRAGMENT_FIN (1 << 7)
 
 #define WS_FLAGS_SSL_INIT (1 << 0)
 
@@ -104,42 +89,32 @@ typedef struct _websocket_client
     pthread_mutex_t lock;
     pthread_mutex_t send_lock;
     char *URI;
-    char *host;
-    char *port;
-    char *path;
     SOCKET socket;
     int flags;
     int (*onopen)(struct _websocket_client *);
+    void *onopen_in_data;
     int (*onclose)(struct _websocket_client *);
-    int (*onerror)(struct _websocket_client *, websocket_client_error *err);
+    void *onclose_in_data;
     int (*onmessage)(struct _websocket_client *, websocket_client_message *msg);
+    void *onmessage_in_data;
+    int (*onerror)(struct _websocket_client *, websocket_client_error *err);
+    void *onerror_in_data;
     websocket_client_frame *current_frame;
-#ifdef HAVE_LIBSSL
-	SSL_CTX *ssl_ctx;
-	SSL *ssl;
-#endif
+    // for wss link
+    SSL_CTX *ssl_ctx;
+    SSL *ssl;
 } websocket_client;
 
-//Function defs
+// Function defs
 websocket_client *websocket_client_new(const char *URI);
-websocket_client_error *websocket_client_error_new(int errcode);
-int _websocket_client_read(websocket_client *c, void *buf, int length);
-int _websocket_client_write(websocket_client *c, const void *buf, int length);
-int websocket_client_connect(const char *host, const char *port);
-int websocket_client_send(websocket_client *client, char *strdata);
-int websocket_client_complete_frame(websocket_client *c, websocket_client_frame *frame);
-void websocket_client_handle_control_frame(websocket_client *c, websocket_client_frame *ctl_frame);
 void websocket_client_run(websocket_client *c);
 void websocket_client_finish(websocket_client *client);
-void *websocket_client_run_thread(void *ptr);
-void *websocket_client_handshake_thread(void *ptr);
-void websocket_client_cleanup_frames(websocket_client_frame *first);
-void websocket_client_in_data(websocket_client *c, char in);
-void websocket_client_dispatch_message(websocket_client *c, websocket_client_frame *current);
 void websocket_client_close(websocket_client *client);
-void websocket_client_onclose(websocket_client *client, int (*cb)(websocket_client *c));
-void websocket_client_onopen(websocket_client *client, int (*cb)(websocket_client *c));
-void websocket_client_onmessage(websocket_client *client, int (*cb)(websocket_client *c, websocket_client_message *msg));
-void websocket_client_onerror(websocket_client *client, int (*cb)(websocket_client *c, websocket_client_error *err));
+int websocket_client_send(websocket_client *client, char *strdata);
+// register event
+void websocket_client_onopen(websocket_client *client, int (*cb)(websocket_client *c), void *data);
+void websocket_client_onclose(websocket_client *client, int (*cb)(websocket_client *c), void *data);
+void websocket_client_onmessage(websocket_client *client, int (*cb)(websocket_client *c, websocket_client_message *msg), void *data);
+void websocket_client_onerror(websocket_client *client, int (*cb)(websocket_client *c, websocket_client_error *err), void *data);
 
 #endif

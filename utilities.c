@@ -3,23 +3,6 @@
 // 0xC0: Start of a 2-byte sequence
 static const uint8_t utf8Limits[] = {0xC0, 0xE0, 0xF0, 0xF8, 0xFC};
 
-//拷贝str内容到新分配的内存，需要free
-char *string_mem_copy(const char *str)
-{
-    if (!str)
-    {
-        return NULL;
-    }
-    char *str_copy = (char *)malloc(strlen(str) + 1);
-    if (!str_copy)
-    {
-        return NULL;
-    }
-    memset(str_copy, 0, strlen(str) + 1);
-    strncpy(str_copy, str, strlen(str));
-    return str_copy;
-}
-
 //字符串格式化
 char *string_format(const char *format, ...)
 {
@@ -40,7 +23,7 @@ char *string_format(const char *format, ...)
     return string;
 }
 
-uint16_t *ug_utf8_to_utf16(const char *string, int count, int *utf16len)
+uint16_t *utf8_to_utf16(const char *string, int count, int *utf16len)
 {
     uint8_t ch;
     uint16_t *result;
@@ -107,7 +90,7 @@ uint16_t *ug_utf8_to_utf16(const char *string, int count, int *utf16len)
     return result;
 }
 
-char *ug_utf16_to_utf8(const uint16_t *string, int count, int *utf8len)
+char *utf16_to_utf8(const uint16_t *string, int count, int *utf8len)
 {
     uint16_t ch;
     uint8_t *result;
@@ -144,7 +127,7 @@ char *ug_utf16_to_utf8(const uint16_t *string, int count, int *utf8len)
     return (char *)result;
 }
 
-unsigned char* read_file_to_bytes(const char *path)
+unsigned char *read_file_to_bytes(const char *path, int *length)
 {
     FILE *fl = fopen(path, "r");
     fseek(fl, 0, SEEK_END);
@@ -153,13 +136,17 @@ unsigned char* read_file_to_bytes(const char *path)
     fseek(fl, 0, SEEK_SET);
     fread(ret, 1, len, fl);
     fclose(fl);
+    if(length){
+        *length=len;
+    }
     return ret;
 }
 
-int get_current_time_string(char target[20]){
+int get_current_time_string(char target[20])
+{
     for (int i = 0; i < 20; i++)
     {
-        target[i]='0';
+        target[i] = '0';
     }
     time_t timep;
     time(&timep);
