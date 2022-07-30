@@ -28,6 +28,7 @@ sourcefiles=files('app.c',
 'socketobject.c',
 'utilities.c',
 'websocketclient.c',
+'aria2_entity.c',
 'aria2.c',
 'menuwindow.c'
 )

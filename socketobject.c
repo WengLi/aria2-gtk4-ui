@@ -145,6 +145,20 @@ int socket_object_set_blocking(SOCKET fd, int is_blocking)
 	return TRUE;
 }
 
+int socket_object_port_is_used(unsigned short port)
+{
+	SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	inet_pton(AF_INET, "0.0.0.0", &addr.sin_addr);
+	if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+	{
+		return TRUE;
+	}
+	return FALSE;
+}
+
 int socket_object_close(SOCKET s)
 {
 #if defined _WIN32 || defined _WIN64

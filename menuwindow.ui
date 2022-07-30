@@ -6,19 +6,15 @@
       <section>
         <item>
           <attribute name="label" translatable="yes">添加HTTP/FTP/Magnet任务</attribute>
-          <attribute name="action">win.new</attribute>
+          <attribute name="action">win.add_uri</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">添加BT/PT任务</attribute>
-          <attribute name="action">win.open</attribute>
+          <attribute name="action">win.add_torrent</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">添加Metalink任务</attribute>
-          <attribute name="action">win.save</attribute>
-        </item>
-        <item>
-          <attribute name="label" translatable="yes">none</attribute>
-          <attribute name="action">win.save-as</attribute>
+          <attribute name="action">win.add_metalink</attribute>
         </item>
       </section>
       <section>
@@ -33,83 +29,53 @@
       <section>
         <item>
           <attribute name="label" translatable="yes">暂停所有任务</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.pause_all</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">继续所有任务</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.unpause_all</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">删除已完成或者错误的任务</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.purge_download_result</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_删除条目</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.remove</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_打开保存文件夹</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.open_folder</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_开始</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.unpause</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_暂停</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.pause</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_向上</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.move_up</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_向下</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.move_down</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_移到顶部</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.move_top</attribute>
         </item>
         <item>
           <attribute name="label" translatable="yes">_移到底部</attribute>
-          <attribute name="action">win.copy</attribute>
-        </item>
-      </section>
-    </submenu>
-    <submenu>
-      <attribute name="label" translatable="yes">_编辑</attribute>
-      <section>
-        <item>
-          <attribute name="label" translatable="yes">_设置</attribute>
-          <attribute name="action">win.copy</attribute>
-        </item>
-        <item>
-          <attribute name="label" translatable="yes">_剪切</attribute>
-          <attribute name="action">win.cut</attribute>
-        </item>
-        <item>
-          <attribute name="label" translatable="yes">_粘贴</attribute>
-          <attribute name="action">win.paste</attribute>
-        </item>
-      </section>
-    </submenu>
-    <submenu>
-      <attribute name="label" translatable="yes">_查看</attribute>
-      <section>
-        <item>
-          <attribute name="label" translatable="yes">_none</attribute>
-          <attribute name="action">win.copy</attribute>
+          <attribute name="action">win.move_bottom</attribute>
         </item>
       </section>
     </submenu>
     <submenu>
       <attribute name="label" translatable="yes">_帮助</attribute>
       <section>
-        <item>
-          <attribute name="label" translatable="yes">_帮助</attribute>
-          <attribute name="action">win.help</attribute>
-        </item>
         <item>
           <attribute name="label" translatable="yes">_关于</attribute>
           <attribute name="action">win.about</attribute>
@@ -120,18 +86,16 @@
   <menu id="new_download_menu_model">
     <section>
       <item>
-        <attribute name="label">新建下载</attribute>
-        <attribute name="action">win.new</attribute>
+        <attribute name="label">添加HTTP/FTP/Magnet任务</attribute>
+        <attribute name="action">win.add_uri</attribute>
       </item>
       <item>
-        <attribute name="label">新建种子</attribute>
-        <attribute name="action">win.save</attribute>
+        <attribute name="label">添加BT/PT任务</attribute>
+        <attribute name="action">win.add_torrent</attribute>
       </item>
-    </section>
-    <section>
       <item>
-        <attribute name="label">新建磁链</attribute>
-        <attribute name="action">win.save</attribute>
+        <attribute name="label">添加Metalink任务</attribute>
+        <attribute name="action">win.add_metalink</attribute>
       </item>
     </section>
   </menu>
@@ -180,7 +144,7 @@
                 <property name="label" translatable="yes">开始下载</property>
                 <property name="tooltip-text" translatable="yes">运行选中的下载</property>
                 <property name="icon-name">media-playback-start-symbolic</property>
-                <property name="action-name">win.open</property>
+                <property name="action-name">win.unpause</property>
               </object>
             </child>
             <child>
@@ -188,7 +152,7 @@
                 <property name="label" translatable="yes">暂停下载</property>
                 <property name="tooltip-text" translatable="yes">暂停选中的下载</property>
                 <property name="icon-name">media-playback-pause-symbolic</property>
-                <property name="action-name">win.save</property>
+                <property name="action-name">win.pause</property>
               </object>
             </child>
             <child>
@@ -199,7 +163,7 @@
                 <property name="label" translatable="yes">向上移动</property>
                 <property name="tooltip-text" translatable="yes">上移选择的下载</property>
                 <property name="icon-name">go-up-symbolic</property>
-                <property name="action-name">win.copy</property>
+                <property name="action-name">win.move_up</property>
               </object>
             </child>
             <child>
@@ -207,7 +171,7 @@
                 <property name="label" translatable="yes">向下移动</property>
                 <property name="tooltip-text" translatable="yes">下移选择的下载</property>
                 <property name="icon-name">go-down-symbolic</property>
-                <property name="action-name">win.cut</property>
+                <property name="action-name">win.move_down</property>
               </object>
             </child>
             <child>
@@ -215,7 +179,7 @@
                 <property name="label" translatable="yes">移动到顶部</property>
                 <property name="tooltip-text" translatable="yes">移动选中的下载到顶部</property>
                 <property name="icon-name">go-top-symbolic</property>
-                <property name="action-name">win.paste</property>
+                <property name="action-name">win.move_top</property>
               </object>
             </child>
             <child>
@@ -223,15 +187,20 @@
                 <property name="label" translatable="yes">移动到底部</property>
                 <property name="tooltip-text" translatable="yes">移动选中的下载到底部</property>
                 <property name="icon-name">go-bottom-symbolic</property>
-                <property name="action-name">win.paste</property>
+                <property name="action-name">win.move_bottom</property>
               </object>
             </child>
           </object>
         </child>
         <child>
-          <object class="GtkScrolledWindow" id="scrolledwindow1">
-            <property name="hexpand">1</property>
-            <property name="vexpand">1</property>
+          <object class="GtkBox" id="data_box">
+            <property name="orientation">vertical</property>
+            <child>
+              <object class="GtkScrolledWindow" id="scrolledwindow1">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+              </object>
+            </child>
           </object>
         </child>
         <child>
@@ -243,16 +212,16 @@
   <object class="GtkDialog" id="newdownloadialog1">
     <property name="transient-for">window1</property>
     <property name="modal">True</property>
-    <property name="resizable">False</property>
+    <property name="resizable">True</property>
     <property name="use-header-bar">0</property>
     <property name="title" translatable="yes">新建下载</property>
     <property name="hide-on-close">True</property>
     <child internal-child="content_area">
       <object class="GtkBox">
         <child>
-          <object class="GtkGrid">
-            <property name="hexpand">True</property>
-            <property name="vexpand">True</property>
+          <object class="GtkGrid" id="newdownloa_grid">
+            <property name="hexpand">1</property>
+            <property name="vexpand">1</property>
             <property name="halign">3</property>
             <property name="valign">3</property>
             <property name="row-spacing">10</property>
@@ -263,19 +232,23 @@
             <property name="margin-bottom">10</property>
             <child>
               <object class="GtkLabel">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
                 <property name="halign">1</property>
                 <property name="valign">1</property>
                 <property name="label">_Url:</property>
                 <property name="use-underline">True</property>
                 <property name="mnemonic-widget">url_textview</property>
                 <layout>
-                  <property name="column">0</property>
                   <property name="row">0</property>
+                  <property name="column">0</property>
                 </layout>
               </object>
             </child>
             <child>
               <object class="GtkScrolledWindow">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
                 <property name="valign">1</property>
                 <property name="has-frame">1</property>
                 <property name="min-content-height">150</property>
@@ -283,11 +256,147 @@
                 <property name="min-content-width">600</property>
                 <property name="max-content-width">600</property>
                 <child>
-                  <object class="GtkTextView" id="url_textview" />
+                  <object class="GtkTextView" id="url_textview">
+                    <property name="wrap-mode">GTK_WRAP_CHAR</property>
+                  </object>
                 </child>
                 <layout>
-                  <property name="column">1</property>
                   <property name="row">0</property>
+                  <property name="column">1</property>
+                  <property name="column-span">2</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="halign">1</property>
+                <property name="valign">1</property>
+                <property name="label">_File:</property>
+                <property name="use-underline">True</property>
+                <property name="mnemonic-widget">open_btmt_file_btn</property>
+                <layout>
+                  <property name="row">1</property>
+                  <property name="column">0</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="open_btmt_file_btn">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="valign">center</property>
+                <property name="child">
+                  <object class="GtkLabel">
+                    <property name="label">—</property>
+                    <property name="xalign">0</property>
+                    <property name="ellipsize">start</property>
+                  </object>
+                </property>
+                <signal name="clicked" handler="open_btmt_file_cb" />
+                <layout>
+                  <property name="row">1</property>
+                  <property name="column">1</property>
+                  <property name="column-span">2</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="halign">1</property>
+                <property name="valign">1</property>
+                <property name="label">_Location:</property>
+                <property name="use-underline">True</property>
+                <property name="mnemonic-widget">location_file</property>
+                <layout>
+                  <property name="row">2</property>
+                  <property name="column">0</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="location_file">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="valign">center</property>
+                <property name="child">
+                  <object class="GtkLabel">
+                    <property name="label">—</property>
+                    <property name="xalign">0</property>
+                    <property name="ellipsize">start</property>
+                  </object>
+                </property>
+                <signal name="clicked" handler="open_location_file_cb" />
+                <layout>
+                  <property name="row">2</property>
+                  <property name="column">1</property>
+                  <property name="column-span">2</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="halign">1</property>
+                <property name="valign">1</property>
+                <property name="label">_File Name:</property>
+                <property name="use-underline">True</property>
+                <property name="mnemonic-widget">file_name_text</property>
+                <layout>
+                  <property name="row">3</property>
+                  <property name="column">0</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkEntry" id="file_name_text">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="valign">center</property>
+                <property name="text"></property>
+                <layout>
+                  <property name="row">3</property>
+                  <property name="column">1</property>
+                  <property name="column-span">2</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="halign">1</property>
+                <property name="valign">1</property>
+                <property name="label">_Max Connections:</property>
+                <property name="use-underline">True</property>
+                <property name="mnemonic-widget">spin_conn_btn</property>
+                <layout>
+                  <property name="row">4</property>
+                  <property name="column">0</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="GtkSpinButton" id="spin_conn_btn">
+                <property name="hexpand">1</property>
+                <property name="vexpand">1</property>
+                <property name="valign">center</property>
+                <property name="adjustment">
+                  <object class="GtkAdjustment">
+                    <property name="upper">16</property>
+                    <property name="lower">1</property>
+                    <property name="value">1</property>
+                    <property name="step-increment">1</property>
+                    <property name="page-increment">1</property>
+                  </object>
+                </property>
+                <layout>
+                  <property name="row">4</property>
+                  <property name="column">1</property>
                   <property name="column-span">2</property>
                 </layout>
               </object>
@@ -297,7 +406,7 @@
       </object>
     </child>
     <child type="action">
-      <object class="GtkButton" id="preferencedialog_ok_button">
+      <object class="GtkButton" id="newdownloadialog_ok_button">
         <property name="margin-start">10</property>
         <property name="margin-end">10</property>
         <property name="margin-top">10</property>
@@ -306,18 +415,8 @@
         <property name="use-underline">1</property>
       </object>
     </child>
-    <!-- <child type="action">
-      <object class="GtkButton" id="preferencedialog_status_button">
-        <property name="margin-start">10</property>
-        <property name="margin-end">10</property>
-        <property name="margin-top">10</property>
-        <property name="margin-bottom">10</property>
-        <property name="label" translatable="1">_Status</property>
-        <property name="use-underline">1</property>
-      </object>
-    </child> -->
     <child type="action">
-      <object class="GtkButton" id="preferencedialog_cancel_button">
+      <object class="GtkButton" id="newdownloadialog_cancel_button">
         <property name="margin-start">10</property>
         <property name="margin-end">10</property>
         <property name="margin-top">10</property>
@@ -327,10 +426,9 @@
       </object>
     </child>
     <action-widgets>
-      <action-widget response="ok" default="true">preferencedialog_ok_button</action-widget>
-      <!-- <action-widget response="accept" default="true">preferencedialog_status_button</action-widget> -->
-      <action-widget response="cancel">preferencedialog_cancel_button</action-widget>
+      <action-widget response="ok" default="true">newdownloadialog_ok_button</action-widget>
+      <action-widget response="cancel">newdownloadialog_cancel_button</action-widget>
     </action-widgets>
-    <signal name="response" handler="preferencedialog_response_cb" swapped="NO"></signal>
+    <signal name="response" handler="newdownloadialog_response_cb" swapped="NO"></signal>
   </object>
 </interface>

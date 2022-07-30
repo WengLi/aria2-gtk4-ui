@@ -76,7 +76,14 @@
         "cstdarg": "c",
         "cwctype": "c",
         "typeinfo": "c",
-        "random": "c"
+        "random": "c",
+        "atomic": "c",
+        "cstdint": "c",
+        "stdarg.h": "c",
+        "utility": "c",
+        "initializer_list": "c",
+        "aria2_entity.h": "c",
+        "ftw.h": "c"
     },
     "mesonbuild.configureOnOpen": true,
     "C_Cpp.errorSquiggles": "Enabled"
